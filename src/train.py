@@ -3,6 +3,8 @@ Etapa 5 — Treinamento de modelos e rastreamento com MLflow/DagsHub.
 Treina 3 modelos, registra métricas/artefatos e promove o melhor ao Model Registry.
 """
 import os
+import sys
+import tempfile
 import pathlib
 import dagshub
 import mlflow
@@ -80,20 +82,20 @@ def train_model(name: str, pipeline: Pipeline, X_train, X_test, y_train, y_test,
 
         # Salva relatório de classificação como artefato texto
         report = classification_report(y_test, y_pred, target_names=["Normal", "Suspect", "Pathological"])
-        report_path = f"/tmp/{name}_report.txt"
-        with open(report_path, "w") as f:
+        report_path = pathlib.Path(tempfile.gettempdir()) / f"{name}_report.txt"
+        with open(report_path, "w", encoding="utf-8") as f:
             f.write(report)
-        mlflow.log_artifact(report_path, artifact_path="reports")
+        mlflow.log_artifact(str(report_path), artifact_path="reports")
 
-        mlflow.sklearn.log_model(
+        model_info = mlflow.sklearn.log_model(
             pipeline,
-            artifact_path="model",
-            registered_model_name=None,  # Registra só o melhor depois
+            name="model",
+            registered_model_name=None,
         )
 
         run_id = mlflow.active_run().info.run_id
         print(f"  [{name}] accuracy={metrics['accuracy']:.4f} | f1_macro={metrics['f1_macro']:.4f} | roc_auc={metrics['roc_auc_ovr']:.4f}")
-        return run_id, metrics["f1_macro"]
+        return run_id, metrics["f1_macro"], model_info.model_uri
 
 
 def run():
@@ -147,15 +149,14 @@ def run():
     results = []
     print("\nTreinando modelos:")
     for name, pipeline, params in models:
-        run_id, f1 = train_model(name, pipeline, X_train, X_test, y_train, y_test, params)
-        results.append((run_id, f1, name))
+        run_id, f1, model_uri = train_model(name, pipeline, X_train, X_test, y_train, y_test, params)
+        results.append((run_id, f1, name, model_uri))
 
     # Seleciona o melhor modelo e registra no Model Registry
-    best_run_id, best_f1, best_name = max(results, key=lambda x: x[1])
+    best_run_id, best_f1, best_name, best_model_uri = max(results, key=lambda x: x[1])
     print(f"\nMelhor modelo: {best_name} (f1_macro={best_f1:.4f})")
 
-    model_uri = f"runs:/{best_run_id}/model"
-    mv = mlflow.register_model(model_uri, MODEL_NAME)
+    mv = mlflow.register_model(best_model_uri, MODEL_NAME)
     print(f"Modelo registrado: {MODEL_NAME} v{mv.version}")
 
     # Promove para Production
