@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: fetal-health-app
+    runtime: docker
+    plan: free
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: DAGSHUB_USERNAME
+        sync: false
+      - key: DAGSHUB_TOKEN
+        sync: false
+      - key: DAGSHUB_REPO
+        sync: false
+      - key: MLFLOW_TRACKING_URI
+        sync: false
+      - key: MLFLOW_TRACKING_USERNAME
+        sync: false
+      - key: MLFLOW_TRACKING_PASSWORD
+        sync: false
