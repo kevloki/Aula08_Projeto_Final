@@ -1,0 +1,49 @@
+schema: '2.0'
+stages:
+  ingestion:
+    cmd: python src/ingestion.py
+    deps:
+    - path: src/ingestion.py
+      hash: md5
+      md5: 7c7cb366f946ebd5c11461ad7be4139f
+      size: 1681
+    outs:
+    - path: data/raw/fetal_health.csv
+      hash: md5
+      md5: 279c35412f5dea9ea0a5d3d888a38592
+      size: 180840
+  preprocessing:
+    cmd: python src/preprocessing.py
+    deps:
+    - path: data/raw/fetal_health.csv
+      hash: md5
+      md5: 279c35412f5dea9ea0a5d3d888a38592
+      size: 180840
+    - path: src/preprocessing.py
+      hash: md5
+      md5: 9d4f30476734970d8eeb29226e96e2d1
+      size: 2842
+    outs:
+    - path: data/processed/fetal_health_processed.parquet
+      hash: md5
+      md5: 9a7ffc6a7348f1559bfdbd72d73a609e
+      size: 60653
+  train:
+    cmd: python src/train.py
+    deps:
+    - path: data/processed/fetal_health_processed.parquet
+      hash: md5
+      md5: 9a7ffc6a7348f1559bfdbd72d73a609e
+      size: 60653
+    - path: src/predict.py
+      hash: md5
+      md5: ed895ee16693ddb82037a1616b6ff107
+      size: 2578
+    - path: src/train.py
+      hash: md5
+      md5: df923c951e3e3d12b8c31d6ec66847cb
+      size: 6007
+    params:
+      params.yaml:
+        train.random_state: 42
+        train.test_size: 0.2

@@ -1,0 +1,26 @@
+stages:
+  ingestion:
+    cmd: python src/ingestion.py
+    deps:
+      - src/ingestion.py
+    outs:
+      - data/raw/fetal_health.csv
+
+  preprocessing:
+    cmd: python src/preprocessing.py
+    deps:
+      - src/preprocessing.py
+      - data/raw/fetal_health.csv
+    outs:
+      - data/processed/fetal_health_processed.parquet
+
+  train:
+    cmd: python src/train.py
+    deps:
+      - src/train.py
+      - src/predict.py
+      - data/processed/fetal_health_processed.parquet
+    params:
+      - params.yaml:
+          - train.random_state
+          - train.test_size
