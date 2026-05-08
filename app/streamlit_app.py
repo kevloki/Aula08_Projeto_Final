@@ -46,6 +46,7 @@ FEATURE_DESCRIPTIONS = {
     "histogram_mode": ("Moda do histograma", 60, 187, 1, 120.0),
     "histogram_mean": ("Média do histograma", 73, 182, 1, 137.0),
     "histogram_median": ("Mediana do histograma", 77, 186, 1, 138.0),
+    "histogram_variance": ("Variância do histograma", 0, 270, 1, 3.0),
     "histogram_tendency": ("Tendência do histograma", -1, 1, 1, 0),
 }
 
