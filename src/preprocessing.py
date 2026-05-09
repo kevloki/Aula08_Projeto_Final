@@ -1,8 +1,3 @@
-"""
-Etapa 3 — Feature engineering com DuckDB.
-Lê o CSV bruto, aplica transformações SQL em memória
-e salva Parquet processado em data/processed/.
-"""
 import pathlib
 import duckdb
 import pandas as pd
@@ -16,22 +11,17 @@ PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_PATH = PROCESSED_DIR / "fetal_health_processed.parquet"
 
 TARGET_COL = "fetal_health"
-LABEL_MAP = {1: "Normal", 2: "Suspect", 3: "Pathological"}
 
 
-def run() -> pd.DataFrame:
-    print(f"Carregando dados brutos de: {RAW_PATH}")
+def run():
+    print(f"Lendo: {RAW_PATH}")
     raw_df = pd.read_csv(RAW_PATH)
 
     con = duckdb.connect()
-    # Registra o DataFrame como view virtual
     con.register("raw", raw_df)
 
-    # Transformações SQL:
-    # 1. Remove duplicatas
-    # 2. Garante tipos numéricos corretos
-    # 3. Cria features derivadas: ratio de acelerações e desacelerações
-    # 4. Mapeia target para inteiro
+    # uso DuckDB pra fazer tudo em SQL mesmo — mais limpo que pandas pra esse tipo de coisa
+    # as 3 features novas que criei tentam capturar relacoes que o dataset original nao tem
     query = """
         SELECT
             baseline_value,
@@ -55,7 +45,6 @@ def run() -> pd.DataFrame:
             histogram_median,
             histogram_variance,
             histogram_tendency,
-            -- features derivadas
             CASE
                 WHEN (light_decelerations + severe_decelerations + prolongued_decelerations) = 0 THEN 0
                 ELSE accelerations / (light_decelerations + severe_decelerations + prolongued_decelerations)
@@ -63,21 +52,19 @@ def run() -> pd.DataFrame:
             histogram_max - histogram_min AS histogram_range,
             histogram_mean - histogram_median AS histogram_skew_proxy,
             CAST(fetal_health AS INTEGER) AS fetal_health
-        FROM (
-            SELECT DISTINCT * FROM raw
-        ) deduped
+        FROM (SELECT DISTINCT * FROM raw) deduped
         WHERE fetal_health IS NOT NULL
     """
 
-    processed_df = con.execute(query).df()
+    df = con.execute(query).df()
     con.close()
 
-    print(f"  {len(processed_df)} registros após limpeza e feature engineering.")
-    print(f"  Distribuição de classes:\n{processed_df[TARGET_COL].value_counts().to_string()}")
+    print(f"  {len(df)} registros apos limpeza.")
+    print(f"  Classes:\n{df[TARGET_COL].value_counts().to_string()}")
 
-    processed_df.to_parquet(OUTPUT_PATH, index=False)
+    df.to_parquet(OUTPUT_PATH, index=False)
     print(f"Parquet salvo em: {OUTPUT_PATH}")
-    return processed_df
+    return df
 
 
 if __name__ == "__main__":

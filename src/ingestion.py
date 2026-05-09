@@ -1,7 +1,3 @@
-"""
-Etapa 2 — Ingestão de dados do Supabase para DataFrame local.
-Salva o CSV bruto em data/raw/ para versionamento via DVC.
-"""
 import os
 import pathlib
 import pandas as pd
@@ -17,24 +13,16 @@ OUTPUT_PATH = RAW_DIR / "fetal_health.csv"
 
 
 def get_supabase_client():
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_KEY"]
-    return create_client(url, key)
+    return create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
 
-def fetch_all_rows(client, table: str) -> pd.DataFrame:
-    """Pagina sobre a tabela do Supabase e retorna DataFrame completo."""
+def fetch_all_rows(client, table):
+    # o Supabase limita 1000 linhas por request, entao preciso paginar
     page_size = 1000
     offset = 0
     rows = []
     while True:
-        response = (
-            client.table(table)
-            .select("*")
-            .range(offset, offset + page_size - 1)
-            .execute()
-        )
-        batch = response.data
+        batch = client.table(table).select("*").range(offset, offset + page_size - 1).execute().data
         if not batch:
             break
         rows.extend(batch)
@@ -50,14 +38,14 @@ def run():
 
     print(f"Baixando tabela '{TABLE_NAME}'...")
     df = fetch_all_rows(client, TABLE_NAME)
-    print(f"  {len(df)} registros obtidos, {len(df.columns)} colunas.")
+    print(f"  {len(df)} registros, {len(df.columns)} colunas.")
 
-    # Garante nome padrao sem espacos
+    # o kaggle chama de 'baseline value' com espaco, padronizo aqui
     if "baseline value" in df.columns:
         df = df.rename(columns={"baseline value": "baseline_value"})
 
     df.to_csv(OUTPUT_PATH, index=False)
-    print(f"Dados salvos em: {OUTPUT_PATH}")
+    print(f"Salvo em: {OUTPUT_PATH}")
     return df
 
 

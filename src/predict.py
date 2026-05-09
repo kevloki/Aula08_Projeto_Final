@@ -1,18 +1,15 @@
-"""
-Função de inferência reutilizável — carrega o modelo Production do MLflow
-e retorna a predição com probabilidades para um input arbitrário.
-"""
 import os
 import mlflow
 import mlflow.sklearn
 import pandas as pd
-import dagshub
 from dotenv import load_dotenv
 
 load_dotenv()
 
 MODEL_NAME = "fetal-health-best-model"
-LABEL_MAP = {0: "Normal", 1: "Suspect", 2: "Pathological"}
+LABEL_MAP  = {0: "Normal", 1: "Suspect", 2: "Pathological"}
+
+# mesma ordem usada no treino — importante nao mudar
 FEATURE_COLS = [
     "baseline_value", "accelerations", "fetal_movement", "uterine_contractions",
     "light_decelerations", "severe_decelerations", "prolongued_decelerations",
@@ -24,54 +21,35 @@ FEATURE_COLS = [
     "histogram_tendency", "accel_decel_ratio", "histogram_range", "histogram_skew_proxy",
 ]
 
-_model_cache = None
+_cache = None
 
 
-def _setup_dagshub():
-    dagshub.init(
-        repo_owner=os.environ["DAGSHUB_USERNAME"],
-        repo_name=os.environ["DAGSHUB_REPO"].split("/")[-1],
-        mlflow=True,
-    )
+def load_model():
+    global _cache
+    if _cache is None:
+        username = os.environ["DAGSHUB_USERNAME"]
+        token    = os.environ["DAGSHUB_TOKEN"]
+        repo     = os.environ["DAGSHUB_REPO"].split("/")[-1]
+        mlflow.set_tracking_uri(f"https://dagshub.com/{username}/{repo}.mlflow")
+        os.environ["MLFLOW_TRACKING_USERNAME"] = username
+        os.environ["MLFLOW_TRACKING_PASSWORD"] = token
+        _cache = mlflow.sklearn.load_model(f"models:/{MODEL_NAME}/1")
+    return _cache
 
 
-def load_production_model():
-    global _model_cache
-    if _model_cache is None:
-        _setup_dagshub()
-        _model_cache = mlflow.sklearn.load_model(f"models:/{MODEL_NAME}/Production")
-    return _model_cache
+def predict(inputs: dict) -> dict:
+    # calculo as features derivadas antes de montar o DataFrame
+    decels = inputs.get("light_decelerations", 0) + inputs.get("severe_decelerations", 0) + inputs.get("prolongued_decelerations", 0)
+    inputs["accel_decel_ratio"]     = inputs.get("accelerations", 0) / decels if decels > 0 else 0
+    inputs["histogram_range"]       = inputs.get("histogram_max", 0) - inputs.get("histogram_min", 0)
+    inputs["histogram_skew_proxy"]  = inputs.get("histogram_mean", 0) - inputs.get("histogram_median", 0)
 
-
-def predict(input_dict: dict) -> dict:
-    """
-    Recebe um dicionário com as features brutas (mesmas do CSV original)
-    e retorna {'label': str, 'class_id': int, 'probabilities': dict}.
-    """
-    # Calcula features derivadas
-    decels = (
-        input_dict.get("light_decelerations", 0)
-        + input_dict.get("severe_decelerations", 0)
-        + input_dict.get("prolongued_decelerations", 0)
-    )
-    input_dict["accel_decel_ratio"] = (
-        input_dict.get("accelerations", 0) / decels if decels > 0 else 0
-    )
-    input_dict["histogram_range"] = (
-        input_dict.get("histogram_max", 0) - input_dict.get("histogram_min", 0)
-    )
-    input_dict["histogram_skew_proxy"] = (
-        input_dict.get("histogram_mean", 0) - input_dict.get("histogram_median", 0)
-    )
-
-    df = pd.DataFrame([input_dict])[FEATURE_COLS]
-    model = load_production_model()
-
+    df       = pd.DataFrame([inputs])[FEATURE_COLS]
+    model    = load_model()
     class_id = int(model.predict(df)[0])
-    probs = model.predict_proba(df)[0]
+    probs    = model.predict_proba(df)[0]
 
     return {
-        "label": LABEL_MAP[class_id],
-        "class_id": class_id,
+        "label":         LABEL_MAP[class_id],
         "probabilities": {LABEL_MAP[i]: float(p) for i, p in enumerate(probs)},
     }
