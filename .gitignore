@@ -19,6 +19,9 @@ mlruns/
 .dvc/cache
 .dvc/tmp
 
+setup_db.py
+setup_supabase.py
+
 *.egg-info/
 dist/
 build/

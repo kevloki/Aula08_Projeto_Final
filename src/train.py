@@ -27,13 +27,20 @@ warnings.filterwarnings("ignore")
 
 load_dotenv()
 
+import yaml
+
 PROCESSED_PATH = (
     pathlib.Path(__file__).parent.parent / "data" / "processed" / "fetal_health_processed.parquet"
 )
+PARAMS_PATH = pathlib.Path(__file__).parent.parent / "params.yaml"
 TARGET_COL = "fetal_health"
 EXPERIMENT_NAME = "fetal-health-classification"
 MODEL_NAME = "fetal-health-best-model"
-RANDOM_STATE = 42
+
+_params = yaml.safe_load(PARAMS_PATH.read_text())["train"]
+RANDOM_STATE = _params["random_state"]
+TEST_SIZE = _params["test_size"]
+CV_FOLDS = _params["cv_folds"]
 
 
 def setup_mlflow():
@@ -68,7 +75,7 @@ def train_model(name: str, pipeline: Pipeline, X_train, X_test, y_train, y_test,
         mlflow.log_params(params)
 
         # Cross-validation
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+        cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
         cv_scores = cross_val_score(pipeline, X_train, y_train, cv=cv, scoring="f1_macro")
         mlflow.log_metric("cv_f1_macro_mean", cv_scores.mean())
         mlflow.log_metric("cv_f1_macro_std", cv_scores.std())
@@ -105,7 +112,7 @@ def run():
     print("Carregando dados processados...")
     X, y = load_data()
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=RANDOM_STATE, stratify=y
+        X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
     )
     print(f"  Train: {len(X_train)} | Test: {len(X_test)}")
 
