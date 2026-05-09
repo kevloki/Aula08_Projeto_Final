@@ -21,6 +21,9 @@ mlruns/
 
 setup_db.py
 setup_supabase.py
+make_pptx.py
+.claude/
+~$*
 
 *.egg-info/
 dist/
