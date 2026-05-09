@@ -42,12 +42,14 @@ FEATURES = {
 
 @st.cache_resource(show_spinner="Carregando modelo... (pode levar ~30s na primeira vez)")
 def load_model():
-    import dagshub, mlflow.sklearn
-    dagshub.init(
-        repo_owner=os.environ["DAGSHUB_USERNAME"],
-        repo_name=os.environ["DAGSHUB_REPO"].split("/")[-1],
-        mlflow=True,
-    )
+    import mlflow, mlflow.sklearn
+    username = os.environ["DAGSHUB_USERNAME"]
+    token = os.environ["DAGSHUB_TOKEN"]
+    repo = os.environ["DAGSHUB_REPO"].split("/")[-1]
+    os.environ["MLFLOW_TRACKING_URI"] = f"https://dagshub.com/{username}/{repo}.mlflow"
+    os.environ["MLFLOW_TRACKING_USERNAME"] = username
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = token
+    mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
     return mlflow.sklearn.load_model("models:/fetal-health-best-model/1")
 
 
